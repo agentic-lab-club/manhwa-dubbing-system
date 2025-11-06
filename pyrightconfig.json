@@ -1,0 +1,5 @@
+{
+  "venvPath": "Tlok_Backend",
+  "venv": ".venv",
+  "reportMissingImports": "none"
+}
