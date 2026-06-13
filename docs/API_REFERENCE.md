@@ -14,15 +14,29 @@ Starts a dubbing process.
   "project_name": "solo_leveling",
   "language": "en",
   "voice": "female_expressive",
-  "chapters": [1, 2, 3]
+  "chapters": [1, 2, 3],
+  "images_dir": "Tlok_Backend/<images-dir>",
+  "audio_dir": "Tlok_Backend/zvyki",
+  "texts_dir": "data/texts",
+  "background_music": "data/music/theme.mp3",
+  "ml_command": "poetry run manhwa-ml",
+  "output_dir": "output",
+  "pairing": "sequential",
+  "recap_style": "engaging",
+  "synthesize_voice": false,
+  "render": false
 }
 ```
 **Response**
 ```json
 {
-  "task_id": "b3d91e12",
-  "status": "started",
-  "estimated_time": "25m"
+  "job_id": "job-1781388039172",
+  "status": "pipeline_ready",
+  "pairs_count": 5,
+  "job_dir": "output/jobs/job-1781388039172",
+  "output_video": null,
+  "message": "minimal pipeline artifacts created; render disabled",
+  "artifacts": []
 }
 ```
 

@@ -16,6 +16,12 @@ services:
 pipeline:
   concurrency: 4
   logging: detailed
+  pairing: sequential
+  language: eng
+  recap_style: engaging
+  synthesize_voice: false
+  render: false
+  ml_command: poetry run manhwa-ml
 
 api:
   port: 8000

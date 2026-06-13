@@ -108,17 +108,16 @@ git clone https://github.com/yourusername/ai-manhwa-dubbing.git
 cd ai-manhwa-dubbing
 ```
 
-### 2. Setup Virtual Environment
+### 2. Setup Python Dependencies With Poetry
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+poetry install
 ```
 
-### 3. Install Dependencies
+### 3. Run Python Utilities
 
 ```bash
-pip install -r requirements.txt
+poetry run build-video
 ```
 
 ### 4. Configure Environment
@@ -178,7 +177,7 @@ manhwa-dubbing-ai/
 ├── config/                  # Configuration files
 ├── docs/                    # Project documentation
 ├── tests/                   # Unit tests
-├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 

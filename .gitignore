@@ -1,1 +1,4 @@
 .specstory
+target/
+output/
+backend-rust/target/

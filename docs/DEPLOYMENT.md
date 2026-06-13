@@ -2,10 +2,15 @@
 
 ## Local Development
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn backend.main:app --reload
+poetry install
+poetry run build-video
+```
+
+Minimal Rust backend:
+
+```bash
+cd backend-rust
+cargo run -- --addr 127.0.0.1:8000
 ```
 
 ## Docker Deployment
