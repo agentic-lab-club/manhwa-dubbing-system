@@ -37,6 +37,8 @@ struct PipelineRequest {
     output_dir: PathBuf,
     texts_dir: Option<PathBuf>,
     background_music: Option<PathBuf>,
+    music_dir: PathBuf,
+    music_mood: String,
     ml_command: Option<String>,
     pairing: PairingMode,
     render: bool,
@@ -125,6 +127,7 @@ fn default_request() -> PipelineRequest {
     } else {
         PathBuf::from("..").join("output")
     };
+    let music_dir = existing_or_parent(PathBuf::from("assets").join("music"));
 
     PipelineRequest {
         images_dir,
@@ -132,6 +135,8 @@ fn default_request() -> PipelineRequest {
         output_dir,
         texts_dir: None,
         background_music: None,
+        music_dir,
+        music_mood: "neutral".to_string(),
         ml_command: None,
         pairing: PairingMode::Sequential,
         render: false,
@@ -168,6 +173,12 @@ fn apply_args_to_request(args: &[String], request: &mut PipelineRequest) {
     }
     if let Some(value) = arg_value(args, "--background-music") {
         request.background_music = Some(PathBuf::from(value));
+    }
+    if let Some(value) = arg_value(args, "--music-dir") {
+        request.music_dir = PathBuf::from(value);
+    }
+    if let Some(value) = arg_value(args, "--music-mood") {
+        request.music_mood = value;
     }
     if let Some(value) = arg_value(args, "--ml-command") {
         request.ml_command = Some(value);
@@ -248,7 +259,10 @@ fn run_pipeline(request: &PipelineRequest) -> Result<JobResult, String> {
         let tts_artifact = run_tts_stage(&job_dir, request, &recap_text)?;
         artifacts.push(tts_artifact);
 
-        let audio_artifact = run_audio_mix_stage(&job_dir, request, &pairs)?;
+        let (selected_music, music_artifact) = run_music_stage(&job_dir, request)?;
+        artifacts.push(music_artifact);
+
+        let audio_artifact = run_audio_mix_stage(&job_dir, &pairs, selected_music.as_deref())?;
         artifacts.push(audio_artifact);
     }
 
@@ -482,6 +496,7 @@ fn collect_ml_artifacts(job_dir: &Path) -> Vec<StageArtifact> {
             },
         ),
         ("audio_mix", "ready", "audio_mix.json"),
+        ("music", "ready", "music_selection.json"),
     ]
     .into_iter()
     .filter_map(|(stage, status, file)| {
@@ -877,10 +892,79 @@ fn synthesize_windows_sapi(text: &str, wav_path: &Path) -> Result<(), String> {
     }
 }
 
-fn run_audio_mix_stage(
+fn run_music_stage(
     job_dir: &Path,
     request: &PipelineRequest,
+) -> Result<(Option<PathBuf>, StageArtifact), String> {
+    let selected = request
+        .background_music
+        .clone()
+        .filter(|path| path.is_file())
+        .or_else(|| select_music_track(&request.music_dir, &request.music_mood));
+    let path = job_dir.join("music_selection.json");
+    let selected_json = selected
+        .as_ref()
+        .map(|path| format!("\"{}\"", json_escape_path(path)))
+        .unwrap_or_else(|| "null".to_string());
+    let status = if selected.is_some() {
+        "selected"
+    } else {
+        "empty"
+    };
+    let message = if selected.is_some() {
+        "background music selected"
+    } else {
+        "no background music found; add tracks to assets/music or pass --background-music"
+    };
+
+    fs::write(
+        &path,
+        format!(
+            "{{\n  \"music_dir\": \"{}\",\n  \"mood\": \"{}\",\n  \"selected\": {}\n}}\n",
+            json_escape_path(&request.music_dir),
+            json_escape(&request.music_mood),
+            selected_json
+        ),
+    )
+    .map_err(|err| format!("cannot write music selection: {err}"))?;
+
+    Ok((
+        selected,
+        StageArtifact {
+            stage: "music".to_string(),
+            status: status.to_string(),
+            path: Some(path),
+            message: message.to_string(),
+        },
+    ))
+}
+
+fn select_music_track(music_dir: &Path, mood: &str) -> Option<PathBuf> {
+    let mut tracks =
+        collect_media_files(music_dir, &["mp3", "wav", "ogg", "m4a", "aac", "flac"]).ok()?;
+    if tracks.is_empty() {
+        return None;
+    }
+    tracks.sort_by_key(|path| {
+        let name = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        let mood_match = if name.contains(&mood.to_ascii_lowercase()) {
+            0
+        } else {
+            1
+        };
+        (mood_match, name)
+    });
+    tracks.into_iter().next()
+}
+
+fn run_audio_mix_stage(
+    job_dir: &Path,
     pairs: &[MediaPair],
+    selected_music: Option<&Path>,
 ) -> Result<StageArtifact, String> {
     let path = job_dir.join("audio_mix.json");
     let narration = job_dir.join("narration.wav");
@@ -896,9 +980,7 @@ fn run_audio_mix_stage(
     ));
     json.push_str(&format!(
         "  \"background_music\": {},\n",
-        request
-            .background_music
-            .as_ref()
+        selected_music
             .map(|path| format!("\"{}\"", json_escape_path(path)))
             .unwrap_or_else(|| "null".to_string())
     ));
@@ -1061,6 +1143,14 @@ fn write_manifest(
             json_escape_path(background_music)
         ));
     }
+    json.push_str(&format!(
+        "  \"music_dir\": \"{}\",\n",
+        json_escape_path(&request.music_dir)
+    ));
+    json.push_str(&format!(
+        "  \"music_mood\": \"{}\",\n",
+        json_escape(&request.music_mood)
+    ));
     if let Some(ml_command) = &request.ml_command {
         json.push_str(&format!(
             "  \"ml_command\": \"{}\",\n",
@@ -1306,6 +1396,12 @@ fn apply_json_to_request(body: &str, request: &mut PipelineRequest) {
     if let Some(value) = json_string(body, "background_music") {
         request.background_music = Some(PathBuf::from(value));
     }
+    if let Some(value) = json_string(body, "music_dir") {
+        request.music_dir = PathBuf::from(value);
+    }
+    if let Some(value) = json_string(body, "music_mood") {
+        request.music_mood = value;
+    }
     if let Some(value) = json_string(body, "ml_command") {
         request.ml_command = Some(value);
     }
@@ -1461,7 +1557,8 @@ HTTP:
   GET  /api/v1/result/<job_id>
 
 JSON body fields:
-  images_dir, audio_dir, texts_dir, background_music, ml_command, output_dir, pairing=sequential|stem
+  images_dir, audio_dir, texts_dir, background_music, music_dir, music_mood, ml_command
+  output_dir, pairing=sequential|stem
   language, recap_style, voice, synthesize_voice=true|false
   render=true|false, width, height, fps
 "

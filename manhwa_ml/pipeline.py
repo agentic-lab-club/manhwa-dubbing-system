@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from .io_utils import as_path, read_json, write_json, write_text
+from .music import MusicLibrary
 from .ocr import run_ocr
 from .panels import detect_panels
 from .recap import generate_recap
@@ -61,7 +62,19 @@ def run_worker(manifest_path: Path, job_dir: Path, synthesize_voice: bool = Fals
         )
 
     audio_mix_path = job_dir / "audio_mix.json"
-    write_json(audio_mix_path, _audio_mix_payload(manifest, pairs, job_dir))
+    music_dir = _resolve_optional_path(as_path(manifest.get("music_dir")), project_root) or project_root / "assets" / "music"
+    music_mood = str(manifest.get("music_mood") or "neutral")
+    selected_music = MusicLibrary(music_dir).write_selection(job_dir / "music_selection.json", music_mood)
+    artifacts.append(
+        _artifact(
+            "music",
+            "selected" if selected_music else "empty",
+            job_dir / "music_selection.json",
+            "background music selected" if selected_music else "no music tracks available in library",
+        )
+    )
+
+    write_json(audio_mix_path, _audio_mix_payload(manifest, pairs, job_dir, selected_music.path if selected_music else None))
     artifacts.append(_artifact("audio_mix", "ready", audio_mix_path, "audio mix plan created"))
 
     worker_status = {"status": "completed", "artifacts": artifacts}
@@ -69,12 +82,18 @@ def run_worker(manifest_path: Path, job_dir: Path, synthesize_voice: bool = Fals
     return worker_status
 
 
-def _audio_mix_payload(manifest: dict[str, Any], pairs: list[dict[str, Any]], job_dir: Path) -> dict[str, Any]:
+def _audio_mix_payload(
+    manifest: dict[str, Any],
+    pairs: list[dict[str, Any]],
+    job_dir: Path,
+    selected_music: Path | None,
+) -> dict[str, Any]:
     narration = job_dir / "narration.wav"
+    background_music = manifest.get("background_music") or (str(selected_music) if selected_music else None)
     return {
         "strategy": "narration-plus-source-audio-plan",
         "narration": str(narration) if narration.exists() else None,
-        "background_music": manifest.get("background_music"),
+        "background_music": background_music,
         "source_audio": [{"index": pair["index"], "path": pair["audio"], "volume": 1.0} for pair in pairs],
         "background_volume": 0.25,
         "narration_volume": 1.0,

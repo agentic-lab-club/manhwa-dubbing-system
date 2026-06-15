@@ -1,4 +1,12 @@
 .specstory
 target/
 output/
+output-ci/
 backend-rust/target/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+dist/

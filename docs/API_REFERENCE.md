@@ -19,6 +19,8 @@ Starts a dubbing process.
   "audio_dir": "Tlok_Backend/zvyki",
   "texts_dir": "data/texts",
   "background_music": "data/music/theme.mp3",
+  "music_dir": "assets/music",
+  "music_mood": "dramatic",
   "ml_command": "poetry run manhwa-ml",
   "output_dir": "output",
   "pairing": "sequential",

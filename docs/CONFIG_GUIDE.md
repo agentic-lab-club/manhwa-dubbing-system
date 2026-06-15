@@ -22,6 +22,8 @@ pipeline:
   synthesize_voice: false
   render: false
   ml_command: poetry run manhwa-ml
+  music_dir: assets/music
+  music_mood: dramatic
 
 api:
   port: 8000

@@ -22,6 +22,7 @@ The Rust MVP creates these job artifacts under `output/jobs/<job_id>`:
 - `panels.json` from panel detection metadata
 - `tts_request.json`, or `narration.wav` with `--synthesize-voice`
 - `audio_mix.json` for narration/source/background audio planning
+- `music_selection.json` from the local `assets/music` library
 - `status.json`
 
 Run the Rust HTTP API:
@@ -36,6 +37,14 @@ Delegate model stages to the Python ML worker:
 ```powershell
 cd backend-rust
 cargo run -- --once --ml-command "poetry run manhwa-ml" --synthesize-voice
+```
+
+Use the local music library for background overlay:
+
+```powershell
+poetry run manhwa-ml music --library assets/music --list
+cd backend-rust
+cargo run -- --once --music-dir ../assets/music --music-mood dramatic
 ```
 
 Prepare Python utilities with Poetry:

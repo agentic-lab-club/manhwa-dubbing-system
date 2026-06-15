@@ -1,0 +1,55 @@
+name: Python ML CI
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "manhwa_ml/**"
+      - "assets/music/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/python.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "manhwa_ml/**"
+      - "assets/music/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/python.yml"
+
+jobs:
+  python:
+    name: poetry, tests, worker smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "1.8.3"
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --with dev --without ml
+
+      - name: Python compile
+        run: poetry run python -m compileall manhwa_ml tests
+
+      - name: Tests
+        run: poetry run pytest tests
+
+      - name: ML CLI help
+        run: poetry run manhwa-ml --help
+
+      - name: Music library smoke
+        run: poetry run manhwa-ml music --library assets/music --list

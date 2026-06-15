@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    defaults:
+      run:
+        working-directory: backend-rust
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --locked --release
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          cp target/release/manhwa-dubbing-backend dist/manhwa-dubbing-backend-linux
+          tar -czf dist/manhwa-dubbing-backend-linux.tar.gz -C dist manhwa-dubbing-backend-linux
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/manhwa-dubbing-backend.exe dist/manhwa-dubbing-backend-windows.exe
+          Compress-Archive -Path dist/manhwa-dubbing-backend-windows.exe -DestinationPath dist/manhwa-dubbing-backend-windows.zip -Force
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: manhwa-dubbing-backend-${{ runner.os }}
+          path: backend-rust/dist/*
+
+  publish:
+    name: publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*

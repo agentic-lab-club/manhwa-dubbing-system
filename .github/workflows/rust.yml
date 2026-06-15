@@ -1,24 +1,58 @@
-name: Rust
+name: Rust CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+    paths:
+      - "backend-rust/**"
+      - "assets/music/**"
+      - ".github/workflows/rust.yml"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+    paths:
+      - "backend-rust/**"
+      - "assets/music/**"
+      - ".github/workflows/rust.yml"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  rust:
+    name: fmt, check, test, smoke
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-rust
 
     steps:
-- name: Build
-  run: cargo build --verbose
-  working-directory: backend-rust
+      - name: Checkout
+        uses: actions/checkout@v4
 
-- name: Run tests
-  run: cargo test --verbose
-  working-directory: backend-rust
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend-rust
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Cargo check
+        run: cargo check --locked
+
+      - name: Clippy
+        run: cargo clippy --locked -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked --verbose
+
+      - name: Build
+        run: cargo build --locked --release
+
+      - name: Pipeline smoke
+        run: cargo run --locked -- --once --output ../output-ci --music-dir ../assets/music

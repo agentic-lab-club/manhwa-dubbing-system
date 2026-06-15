@@ -11,6 +11,7 @@ It currently supports:
 - panel metadata generation with a full-page fallback;
 - TTS request generation, with optional Windows SAPI `narration.wav`;
 - audio mix planning with optional background music;
+- local music library selection from `assets/music`;
 - creating `manifest.json`, `ocr.json`, `recap.txt`, `panels.json`, `tts_request.json`, `audio_mix.json`, and `status.json`;
 - exposing minimal HTTP endpoints;
 - optional `ffmpeg` rendering when `ffmpeg` is installed.
@@ -37,6 +38,8 @@ Example body:
   "audio_dir": "../Tlok_Backend/zvyki",
   "texts_dir": "../data/texts",
   "background_music": "../data/music/theme.mp3",
+  "music_dir": "../assets/music",
+  "music_mood": "dramatic",
   "output_dir": "../output",
   "pairing": "sequential",
   "language": "eng",
@@ -59,6 +62,8 @@ Add `--render` to generate `result.mp4`. Rendering requires `ffmpeg` in PATH.
 Add `--synthesize-voice` to generate `narration.wav` through Windows SAPI.
 
 Use `--texts <dir>` when OCR text has already been prepared as sidecar `.txt` files with names matching the images.
+
+Use `--music-dir <dir>` and `--music-mood <mood>` to choose background music from the local library. Passing `--background-music <file>` overrides automatic selection.
 
 ## Python ML Worker
 
