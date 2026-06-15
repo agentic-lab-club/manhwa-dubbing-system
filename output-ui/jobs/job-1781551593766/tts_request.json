@@ -1,0 +1,5 @@
+{
+  "provider": "windows-sapi-or-external",
+  "voice": "female_expressive",
+  "text_path": "output-ui\\jobs\\job-1781551593766\\recap.txt"
+}

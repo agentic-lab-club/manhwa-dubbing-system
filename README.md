@@ -32,6 +32,14 @@ cd backend-rust
 cargo run -- --addr 127.0.0.1:8000
 ```
 
+Open the browser UI:
+
+```text
+http://127.0.0.1:8000/
+```
+
+The UI lets users configure input folders, translation language, voice, ML worker command, music mood/library, rendering, and live job metrics.
+
 Delegate model stages to the Python ML worker:
 
 ```powershell

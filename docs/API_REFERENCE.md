@@ -7,6 +7,18 @@ http://localhost:8000/api/v1
 
 ## Endpoints
 
+### GET /
+Serves the browser console UI.
+
+### GET /metrics
+Returns runtime status for jobs, ML/AI stages, and local tool capabilities.
+
+### GET /music/library
+Returns music catalog metadata and scanned audio files.
+
+### POST /music/register
+Registers a music file path in `assets/music/library.json`.
+
 ### POST /dubbing/start
 Starts a dubbing process.
 ```json

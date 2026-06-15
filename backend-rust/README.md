@@ -23,9 +23,16 @@ cd backend-rust
 cargo run -- --addr 127.0.0.1:8000
 ```
 
+Open `http://127.0.0.1:8000/` to use the browser console.
+
 Endpoints:
 
 - `GET /health`
+- `GET /`
+- `GET /api/v1/metrics`
+- `GET /api/v1/jobs`
+- `GET /api/v1/music/library`
+- `POST /api/v1/music/register`
 - `POST /api/v1/dubbing/start`
 - `GET /api/v1/status/<job_id>`
 - `GET /api/v1/result/<job_id>`

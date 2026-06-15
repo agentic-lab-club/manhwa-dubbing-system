@@ -1,0 +1,19 @@
+{
+  "job_id": "job-1781551593766",
+  "status": "pipeline_ready",
+  "pairs_count": 5,
+  "job_dir": "output-ui\\jobs\\job-1781551593766",
+  "output_video": null,
+  "message": "minimal pipeline artifacts created; render disabled",
+  "artifacts": [
+    {"stage":"input","status":"completed","path":"output-ui\\jobs\\job-1781551593766\\manifest.json","message":"5 media pairs discovered"},
+    {"stage":"ocr","status":"fallback","path":"output-ui\\jobs\\job-1781551593766\\ocr.json","message":"OCR fallback created empty records; tesseract/text sidecars not available"},
+    {"stage":"recap","status":"completed","path":"output-ui\\jobs\\job-1781551593766\\recap.txt","message":"local extractive recap generated; OpenAI provider can replace this stage later"},
+    {"stage":"translation","status":"fallback","path":"output-ui\\jobs\\job-1781551593766\\translation.txt","message":"translation stage created; external provider can replace fallback"},
+    {"stage":"panel_detection","status":"fallback","path":"output-ui\\jobs\\job-1781551593766\\panels.json","message":"panel metadata generated using full-page fallback"},
+    {"stage":"tts","status":"ready","path":"output-ui\\jobs\\job-1781551593766\\tts_request.json","message":"TTS request prepared; pass --synthesize-voice to create narration.wav via Windows SAPI"},
+    {"stage":"music","status":"empty","path":"output-ui\\jobs\\job-1781551593766\\music_selection.json","message":"no background music found; add tracks to assets/music or pass --background-music"},
+    {"stage":"audio_mix","status":"ready","path":"output-ui\\jobs\\job-1781551593766\\audio_mix.json","message":"audio mix plan created; ffmpeg can render the final mix when installed"},
+    {"stage":"video","status":"ready","path":null,"message":"render disabled; pass --render or render=true after installing ffmpeg"}
+  ]
+}

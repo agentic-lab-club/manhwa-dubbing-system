@@ -1,0 +1,65 @@
+{
+  "method": "full-page-fallback",
+  "panels": [
+    {
+      "index": 1,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202235.png",
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 547,
+        "height": 831
+      },
+      "confidence": 1.0,
+      "note": "full page used as one panel; OpenCV/YOLO can replace this stage later"
+    },
+    {
+      "index": 2,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202329.png",
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 534,
+        "height": 868
+      },
+      "confidence": 1.0,
+      "note": "full page used as one panel; OpenCV/YOLO can replace this stage later"
+    },
+    {
+      "index": 3,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202408.png",
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 529,
+        "height": 859
+      },
+      "confidence": 1.0,
+      "note": "full page used as one panel; OpenCV/YOLO can replace this stage later"
+    },
+    {
+      "index": 4,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202510.png",
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 534,
+        "height": 873
+      },
+      "confidence": 1.0,
+      "note": "full page used as one panel; OpenCV/YOLO can replace this stage later"
+    },
+    {
+      "index": 5,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202553.png",
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 532,
+        "height": 870
+      },
+      "confidence": 1.0,
+      "note": "full page used as one panel; OpenCV/YOLO can replace this stage later"
+    }
+  ]
+}

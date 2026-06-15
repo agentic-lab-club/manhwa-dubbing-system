@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manhwa Dubbing Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Manhwa Dubbing Console</h1>
+        <p>Pipeline orchestration, ML status, voice and music controls</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshBtn" type="button">Refresh</button>
+        <button id="startBtn" type="button" class="primary">Start job</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel config-panel" aria-label="Pipeline settings">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="pipeline" type="button">Pipeline</button>
+          <button class="tab" data-tab="voice" type="button">Voice</button>
+          <button class="tab" data-tab="music" type="button">Music</button>
+        </div>
+
+        <form id="jobForm">
+          <div class="tab-page active" data-page="pipeline">
+            <label>
+              Images directory
+              <input name="images_dir" value="../Tlok_Backend/фото" />
+            </label>
+            <label>
+              Audio directory
+              <input name="audio_dir" value="../Tlok_Backend/zvyki" />
+            </label>
+            <label>
+              Text sidecars directory
+              <input name="texts_dir" placeholder="../data/texts" />
+            </label>
+            <label>
+              Output directory
+              <input name="output_dir" value="../output" />
+            </label>
+            <div class="field-grid">
+              <label>
+                Pairing
+                <select name="pairing">
+                  <option value="sequential">Sequential</option>
+                  <option value="stem">Matching names</option>
+                </select>
+              </label>
+              <label>
+                Recap style
+                <select name="recap_style">
+                  <option value="engaging">Engaging</option>
+                  <option value="dramatic">Dramatic</option>
+                  <option value="neutral">Neutral</option>
+                </select>
+              </label>
+            </div>
+            <label class="check">
+              <input name="render" type="checkbox" />
+              Render video when ffmpeg is available
+            </label>
+            <label class="check">
+              <input name="synthesize_voice" type="checkbox" />
+              Generate narration audio
+            </label>
+          </div>
+
+          <div class="tab-page" data-page="voice">
+            <div class="field-grid">
+              <label>
+                OCR language
+                <select name="language">
+                  <option value="eng">English</option>
+                  <option value="rus">Russian</option>
+                  <option value="kor">Korean</option>
+                  <option value="jpn">Japanese</option>
+                  <option value="chi_sim">Chinese Simplified</option>
+                </select>
+              </label>
+              <label>
+                Translation target
+                <select name="translation_language">
+                  <option value="ru">Russian</option>
+                  <option value="en">English</option>
+                  <option value="ko">Korean</option>
+                  <option value="ja">Japanese</option>
+                  <option value="zh">Chinese</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Voice
+              <select name="voice">
+                <option value="default">Default system voice</option>
+                <option value="female_expressive">Female expressive</option>
+                <option value="male_narrator">Male narrator</option>
+                <option value="dramatic_storyteller">Dramatic storyteller</option>
+              </select>
+            </label>
+            <label>
+              ML command
+              <input name="ml_command" placeholder="poetry run manhwa-ml" />
+            </label>
+          </div>
+
+          <div class="tab-page" data-page="music">
+            <label>
+              Music library directory
+              <input name="music_dir" value="../assets/music" />
+            </label>
+            <div class="field-grid">
+              <label>
+                Music mood
+                <select name="music_mood">
+                  <option value="neutral">Neutral</option>
+                  <option value="dramatic">Dramatic</option>
+                  <option value="action">Action</option>
+                  <option value="sad">Sad</option>
+                  <option value="calm">Calm</option>
+                  <option value="mystery">Mystery</option>
+                </select>
+              </label>
+              <label>
+                Background volume
+                <input name="background_volume" type="number" min="0" max="1" step="0.05" value="0.25" />
+              </label>
+            </div>
+            <label>
+              Exact background music file
+              <input name="background_music" placeholder="../assets/music/dramatic_theme.mp3" />
+            </label>
+          </div>
+        </form>
+      </section>
+
+      <section class="workspace">
+        <section class="panel metrics-panel">
+          <div class="section-head">
+            <h2>ML/AI Metrics</h2>
+            <span id="apiState" class="pill muted">checking</span>
+          </div>
+          <div id="metricsGrid" class="metrics-grid"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h2>Current Job</h2>
+            <span id="jobState" class="pill muted">idle</span>
+          </div>
+          <pre id="jobOutput" class="log">No job started yet.</pre>
+          <div id="artifactList" class="artifact-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h2>Music Library</h2>
+            <button id="reloadMusicBtn" type="button">Reload</button>
+          </div>
+          <form id="musicForm" class="music-form">
+            <input name="path" placeholder="../assets/music/dramatic_theme.mp3" />
+            <input name="title" placeholder="Track title" />
+            <select name="mood">
+              <option value="neutral">neutral</option>
+              <option value="dramatic">dramatic</option>
+              <option value="action">action</option>
+              <option value="sad">sad</option>
+              <option value="calm">calm</option>
+              <option value="mystery">mystery</option>
+            </select>
+            <button type="submit">Add</button>
+          </form>
+          <div id="musicList" class="music-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

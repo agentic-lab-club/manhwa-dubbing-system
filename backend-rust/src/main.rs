@@ -44,6 +44,7 @@ struct PipelineRequest {
     render: bool,
     synthesize_voice: bool,
     language: String,
+    translation_language: String,
     recap_style: String,
     voice: String,
     width: u32,
@@ -142,6 +143,7 @@ fn default_request() -> PipelineRequest {
         render: false,
         synthesize_voice: false,
         language: "eng".to_string(),
+        translation_language: "ru".to_string(),
         recap_style: "engaging".to_string(),
         voice: "default".to_string(),
         width: 1080,
@@ -189,6 +191,9 @@ fn apply_args_to_request(args: &[String], request: &mut PipelineRequest) {
     if let Some(value) = arg_value(args, "--language") {
         request.language = value;
     }
+    if let Some(value) = arg_value(args, "--translation-language") {
+        request.translation_language = value;
+    }
     if let Some(value) = arg_value(args, "--style") {
         request.recap_style = value;
     }
@@ -213,6 +218,20 @@ fn apply_args_to_request(args: &[String], request: &mut PipelineRequest) {
 }
 
 fn run_pipeline(request: &PipelineRequest) -> Result<JobResult, String> {
+    let mut request = request.clone();
+    request.images_dir = resolve_flexible_path(&request.images_dir);
+    request.audio_dir = resolve_flexible_path(&request.audio_dir);
+    request.output_dir = resolve_flexible_path(&request.output_dir);
+    request.music_dir = resolve_flexible_path(&request.music_dir);
+    request.texts_dir = request
+        .texts_dir
+        .as_ref()
+        .map(|path| resolve_flexible_path(path));
+    request.background_music = request
+        .background_music
+        .as_ref()
+        .map(|path| resolve_flexible_path(path));
+
     if !request.images_dir.is_dir() {
         return Err(format!(
             "images directory not found: {}",
@@ -235,7 +254,7 @@ fn run_pipeline(request: &PipelineRequest) -> Result<JobResult, String> {
     let job_dir = request.output_dir.join("jobs").join(&job_id);
     fs::create_dir_all(&job_dir).map_err(|err| format!("cannot create job dir: {err}"))?;
 
-    write_manifest(&job_dir, request, &pairs)?;
+    write_manifest(&job_dir, &request, &pairs)?;
     let mut artifacts = vec![StageArtifact {
         stage: "input".to_string(),
         status: "completed".to_string(),
@@ -244,22 +263,26 @@ fn run_pipeline(request: &PipelineRequest) -> Result<JobResult, String> {
     }];
 
     if request.ml_command.is_some() {
-        artifacts.push(run_ml_worker_stage(&job_dir, request)?);
+        artifacts.push(run_ml_worker_stage(&job_dir, &request)?);
         artifacts.extend(collect_ml_artifacts(&job_dir));
     } else {
-        let (ocr_items, ocr_artifact) = run_ocr_stage(&job_dir, request, &pairs)?;
+        let (ocr_items, ocr_artifact) = run_ocr_stage(&job_dir, &request, &pairs)?;
         artifacts.push(ocr_artifact);
 
-        let (recap_text, recap_artifact) = run_recap_stage(&job_dir, request, &ocr_items)?;
+        let (recap_text, recap_artifact) = run_recap_stage(&job_dir, &request, &ocr_items)?;
         artifacts.push(recap_artifact);
+
+        let (translation_text, translation_artifact) =
+            run_translation_stage(&job_dir, &request, &recap_text)?;
+        artifacts.push(translation_artifact);
 
         let panels_artifact = run_panel_stage(&job_dir, &pairs)?;
         artifacts.push(panels_artifact);
 
-        let tts_artifact = run_tts_stage(&job_dir, request, &recap_text)?;
+        let tts_artifact = run_tts_stage(&job_dir, &request, &translation_text)?;
         artifacts.push(tts_artifact);
 
-        let (selected_music, music_artifact) = run_music_stage(&job_dir, request)?;
+        let (selected_music, music_artifact) = run_music_stage(&job_dir, &request)?;
         artifacts.push(music_artifact);
 
         let audio_artifact = run_audio_mix_stage(&job_dir, &pairs, selected_music.as_deref())?;
@@ -277,7 +300,7 @@ fn run_pipeline(request: &PipelineRequest) -> Result<JobResult, String> {
     };
 
     if request.render {
-        match render_video(request, &pairs, &result.job_dir) {
+        match render_video(&request, &pairs, &result.job_dir) {
             Ok(video_path) => {
                 result.status = "completed".to_string();
                 result.output_video = Some(video_path);
@@ -312,6 +335,21 @@ fn run_pipeline(request: &PipelineRequest) -> Result<JobResult, String> {
 
     write_status(&result)?;
     Ok(result)
+}
+
+fn resolve_flexible_path(path: &Path) -> PathBuf {
+    if path.exists() {
+        return path.to_path_buf();
+    }
+    let stripped = strip_leading_parents(path);
+    if stripped.exists() {
+        return stripped;
+    }
+    let parent_candidate = PathBuf::from("..").join(path);
+    if parent_candidate.exists() {
+        return parent_candidate;
+    }
+    path.to_path_buf()
 }
 
 fn discover_pairs(
@@ -477,10 +515,19 @@ fn strip_windows_verbatim(path: PathBuf) -> PathBuf {
     }
 }
 
+fn strip_leading_parents(path: &Path) -> PathBuf {
+    let mut parts = path.components().peekable();
+    while matches!(parts.peek(), Some(std::path::Component::ParentDir)) {
+        parts.next();
+    }
+    parts.collect()
+}
+
 fn collect_ml_artifacts(job_dir: &Path) -> Vec<StageArtifact> {
     [
         ("ocr", "completed", "ocr.json"),
         ("recap", "completed", "recap.txt"),
+        ("translation", "completed", "translation.txt"),
         ("panel_detection", "completed", "panels.json"),
         (
             "tts",
@@ -702,6 +749,29 @@ fn local_recap(source: &str, style: &str) -> String {
         "Style: {style}\n\n{}\n\nProduction note: this is a local MVP recap generated from available OCR text.",
         selected.join(" ")
     )
+}
+
+fn run_translation_stage(
+    job_dir: &Path,
+    request: &PipelineRequest,
+    recap_text: &str,
+) -> Result<(String, StageArtifact), String> {
+    let translated = format!(
+        "Target language: {}\n\n{}\n\nTranslation note: external translation provider is not configured; source recap is preserved for this MVP stage.",
+        request.translation_language, recap_text
+    );
+    let path = job_dir.join("translation.txt");
+    fs::write(&path, &translated).map_err(|err| format!("cannot write translation: {err}"))?;
+    Ok((
+        translated,
+        StageArtifact {
+            stage: "translation".to_string(),
+            status: "fallback".to_string(),
+            path: Some(path),
+            message: "translation stage created; external provider can replace fallback"
+                .to_string(),
+        },
+    ))
 }
 
 fn split_sentences(text: &str) -> Vec<String> {
@@ -1112,6 +1182,10 @@ fn write_manifest(
         json_escape(&request.language)
     ));
     json.push_str(&format!(
+        "  \"translation_language\": \"{}\",\n",
+        json_escape(&request.translation_language)
+    ));
+    json.push_str(&format!(
         "  \"recap_style\": \"{}\",\n",
         json_escape(&request.recap_style)
     ));
@@ -1255,13 +1329,19 @@ fn handle_connection(mut stream: TcpStream, state: ServerState) -> Result<(), St
         .set_read_timeout(Some(Duration::from_secs(3)))
         .map_err(|err| format!("cannot set read timeout: {err}"))?;
     let request = read_http_request(&mut stream)?;
-    let (status, body) = route_request(&request, state);
-    write_http_response(&mut stream, status, &body)
+    let response = route_request(&request, state);
+    write_http_response(&mut stream, response)
 }
 
 struct HttpRequest {
     method: String,
     path: String,
+    body: String,
+}
+
+struct HttpResponse {
+    status: u16,
+    content_type: &'static str,
     body: String,
 }
 
@@ -1314,11 +1394,48 @@ fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
     Ok(HttpRequest { method, path, body })
 }
 
-fn route_request(request: &HttpRequest, state: ServerState) -> (u16, String) {
-    match (request.method.as_str(), request.path.as_str()) {
+fn route_request(request: &HttpRequest, state: ServerState) -> HttpResponse {
+    let path = request
+        .path
+        .split('?')
+        .next()
+        .unwrap_or(request.path.as_str());
+    if request.method == "OPTIONS" {
+        return response(204, "application/json; charset=utf-8", String::new());
+    }
+
+    match (request.method.as_str(), path) {
+        ("GET", "/") | ("GET", "/index.html") => response(
+            static_status("index.html"),
+            "text/html; charset=utf-8",
+            read_static_file("index.html"),
+        ),
+        ("GET", "/styles.css") => response(
+            static_status("styles.css"),
+            "text/css; charset=utf-8",
+            read_static_file("styles.css"),
+        ),
+        ("GET", "/app.js") => response(
+            static_status("app.js"),
+            "application/javascript; charset=utf-8",
+            read_static_file("app.js"),
+        ),
         ("GET", "/health") | ("GET", "/api/v1/health") => {
-            (200, "{\"status\":\"ok\"}\n".to_string())
+            json_response(200, "{\"status\":\"ok\"}\n".to_string())
         }
+        ("GET", "/api/v1/metrics") => json_response(200, metrics_json(&state)),
+        ("GET", "/api/v1/jobs") => json_response(200, jobs_json(&state)),
+        ("GET", "/api/v1/music/library") => json_response(200, music_library_json(&state)),
+        ("POST", "/api/v1/music/register") => match register_music_track(&state, &request.body) {
+            Ok(body) => json_response(200, body),
+            Err(err) => json_response(
+                400,
+                format!(
+                    "{{\"status\":\"failed\",\"message\":\"{}\"}}\n",
+                    json_escape(&err)
+                ),
+            ),
+        },
         ("POST", "/api/v1/dubbing/start") => {
             let mut pipeline_request = state.default_request.clone();
             apply_json_to_request(&request.body, &mut pipeline_request);
@@ -1327,9 +1444,9 @@ fn route_request(request: &HttpRequest, state: ServerState) -> (u16, String) {
                     if let Ok(mut jobs) = state.jobs.lock() {
                         jobs.insert(result.job_id.clone(), result.job_dir.clone());
                     }
-                    (200, job_result_json(&result))
+                    json_response(200, job_result_json(&result))
                 }
-                Err(err) => (
+                Err(err) => json_response(
                     400,
                     format!(
                         "{{\"status\":\"failed\",\"message\":\"{}\"}}\n",
@@ -1338,19 +1455,53 @@ fn route_request(request: &HttpRequest, state: ServerState) -> (u16, String) {
                 ),
             }
         }
-        _ if request.method == "GET" && request.path.starts_with("/api/v1/status/") => {
-            let job_id = request.path.trim_start_matches("/api/v1/status/");
+        _ if request.method == "GET" && path.starts_with("/api/v1/status/") => {
+            let job_id = path.trim_start_matches("/api/v1/status/");
             read_job_file(&state, job_id, "status.json")
         }
-        _ if request.method == "GET" && request.path.starts_with("/api/v1/result/") => {
-            let job_id = request.path.trim_start_matches("/api/v1/result/");
+        _ if request.method == "GET" && path.starts_with("/api/v1/result/") => {
+            let job_id = path.trim_start_matches("/api/v1/result/");
             read_job_file(&state, job_id, "manifest.json")
         }
-        _ => (404, "{\"status\":\"not_found\"}\n".to_string()),
+        _ => json_response(404, "{\"status\":\"not_found\"}\n".to_string()),
     }
 }
 
-fn read_job_file(state: &ServerState, job_id: &str, file_name: &str) -> (u16, String) {
+fn response(status: u16, content_type: &'static str, body: String) -> HttpResponse {
+    HttpResponse {
+        status,
+        content_type,
+        body,
+    }
+}
+
+fn json_response(status: u16, body: String) -> HttpResponse {
+    response(status, "application/json; charset=utf-8", body)
+}
+
+fn static_status(file_name: &str) -> u16 {
+    if frontend_path(file_name).is_some() {
+        200
+    } else {
+        404
+    }
+}
+
+fn read_static_file(file_name: &str) -> String {
+    frontend_path(file_name)
+        .and_then(|path| fs::read_to_string(path).ok())
+        .unwrap_or_else(|| "Frontend file not found".to_string())
+}
+
+fn frontend_path(file_name: &str) -> Option<PathBuf> {
+    let candidates = [
+        PathBuf::from("frontend").join(file_name),
+        PathBuf::from("..").join("frontend").join(file_name),
+    ];
+    candidates.into_iter().find(|path| path.is_file())
+}
+
+fn read_job_file(state: &ServerState, job_id: &str, file_name: &str) -> HttpResponse {
     let job_dir = state
         .jobs
         .lock()
@@ -1358,26 +1509,202 @@ fn read_job_file(state: &ServerState, job_id: &str, file_name: &str) -> (u16, St
         .and_then(|jobs| jobs.get(job_id).cloned())
         .unwrap_or_else(|| state.default_request.output_dir.join("jobs").join(job_id));
     match fs::read_to_string(job_dir.join(file_name)) {
-        Ok(body) => (200, body),
-        Err(_) => (404, "{\"status\":\"not_found\"}\n".to_string()),
+        Ok(body) => json_response(200, body),
+        Err(_) => json_response(404, "{\"status\":\"not_found\"}\n".to_string()),
     }
 }
 
-fn write_http_response(stream: &mut TcpStream, status: u16, body: &str) -> Result<(), String> {
-    let status_text = match status {
+fn write_http_response(stream: &mut TcpStream, response: HttpResponse) -> Result<(), String> {
+    let status_text = match response.status {
         200 => "OK",
+        204 => "No Content",
         400 => "Bad Request",
         404 => "Not Found",
+        500 => "Internal Server Error",
         _ => "OK",
     };
     let response = format!(
-        "HTTP/1.1 {status} {status_text}\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        body.as_bytes().len(),
-        body
+        "HTTP/1.1 {} {status_text}\r\nContent-Type: {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        response.status,
+        response.content_type,
+        response.body.len(),
+        response.body
     );
     stream
         .write_all(response.as_bytes())
         .map_err(|err| format!("cannot write response: {err}"))
+}
+
+fn metrics_json(state: &ServerState) -> String {
+    let jobs = list_job_dirs(&state.default_request.output_dir);
+    let latest_job = jobs.last().cloned();
+    let latest_status_path = latest_job.as_ref().map(|path| path.join("status.json"));
+    let latest_status_raw = latest_status_path
+        .as_ref()
+        .and_then(|path| fs::read_to_string(path).ok())
+        .unwrap_or_default();
+    let latest_status =
+        json_string(&latest_status_raw, "status").unwrap_or_else(|| "none".to_string());
+    let latest_artifacts = latest_status_raw.matches("\"stage\"").count();
+    let music_files = collect_media_files(
+        &state.default_request.music_dir,
+        &["mp3", "wav", "ogg", "m4a", "aac", "flac"],
+    )
+    .map(|files| files.len())
+    .unwrap_or(0);
+
+    format!(
+        "{{\n  \"jobs_total\": {},\n  \"latest_job\": {},\n  \"latest_status\": \"{}\",\n  \"latest_artifacts\": {},\n  \"music_files\": {},\n  \"capabilities\": {{\n    \"ffmpeg\": {},\n    \"tesseract\": {},\n    \"poetry\": {}\n  }}\n}}\n",
+        jobs.len(),
+        latest_job
+            .as_ref()
+            .and_then(|path| path.file_name())
+            .and_then(|name| name.to_str())
+            .map(|name| format!("\"{}\"", json_escape(name)))
+            .unwrap_or_else(|| "null".to_string()),
+        json_escape(&latest_status),
+        latest_artifacts,
+        music_files,
+        command_available("ffmpeg"),
+        command_available("tesseract"),
+        command_available("poetry")
+    )
+}
+
+fn jobs_json(state: &ServerState) -> String {
+    let jobs = list_job_dirs(&state.default_request.output_dir);
+    let mut json = String::from("{\n  \"jobs\": [\n");
+    for (idx, job_dir) in jobs.iter().rev().take(20).enumerate() {
+        let status_raw = fs::read_to_string(job_dir.join("status.json")).unwrap_or_default();
+        let status = json_string(&status_raw, "status").unwrap_or_else(|| "unknown".to_string());
+        let job_id = job_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        json.push_str(&format!(
+            "    {{\"job_id\":\"{}\",\"status\":\"{}\",\"path\":\"{}\"}}",
+            json_escape(job_id),
+            json_escape(&status),
+            json_escape_path(job_dir)
+        ));
+        if idx + 1 != jobs.len().min(20) {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+    json.push_str("  ]\n}\n");
+    json
+}
+
+fn list_job_dirs(output_dir: &Path) -> Vec<PathBuf> {
+    let jobs_dir = output_dir.join("jobs");
+    let mut jobs = fs::read_dir(jobs_dir)
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.filter_map(Result::ok))
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect::<Vec<_>>();
+    jobs.sort_by_key(|path| path.file_name().map(|name| name.to_os_string()));
+    jobs
+}
+
+fn command_available(name: &str) -> bool {
+    Command::new(name).arg("--version").output().is_ok()
+}
+
+fn music_library_json(state: &ServerState) -> String {
+    let music_dir = &state.default_request.music_dir;
+    let catalog_path = music_dir.join("library.json");
+    let catalog = fs::read_to_string(&catalog_path).unwrap_or_else(|_| "null".to_string());
+    let files = collect_media_files(music_dir, &["mp3", "wav", "ogg", "m4a", "aac", "flac"])
+        .unwrap_or_default();
+    let mut json = format!(
+        "{{\n  \"music_dir\": \"{}\",\n  \"catalog\": {},\n  \"files\": [\n",
+        json_escape_path(music_dir),
+        catalog
+    );
+    for (idx, file) in files.iter().enumerate() {
+        json.push_str(&format!("    \"{}\"", json_escape_path(file)));
+        if idx + 1 != files.len() {
+            json.push(',');
+        }
+        json.push('\n');
+    }
+    json.push_str("  ]\n}\n");
+    json
+}
+
+fn register_music_track(state: &ServerState, body: &str) -> Result<String, String> {
+    let path = json_string(body, "path").ok_or_else(|| "path is required".to_string())?;
+    let title = json_string(body, "title").unwrap_or_else(|| {
+        Path::new(&path)
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .unwrap_or("music")
+            .to_string()
+    });
+    let mood = json_string(body, "mood").unwrap_or_else(|| "neutral".to_string());
+    let license = json_string(body, "license").unwrap_or_else(|| "unknown".to_string());
+    let id = title
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let track = format!(
+        "{{\"id\":\"{}\",\"title\":\"{}\",\"path\":\"{}\",\"mood\":\"{}\",\"tags\":[],\"license\":\"{}\",\"volume\":0.25}}",
+        json_escape(if id.is_empty() { "music" } else { &id }),
+        json_escape(&title),
+        json_escape(&path),
+        json_escape(&mood),
+        json_escape(&license)
+    );
+
+    let music_dir = &state.default_request.music_dir;
+    fs::create_dir_all(music_dir).map_err(|err| format!("cannot create music dir: {err}"))?;
+    let catalog_path = music_dir.join("library.json");
+    let current = fs::read_to_string(&catalog_path).unwrap_or_else(|_| {
+        "{\n  \"version\": 1,\n  \"default_mood\": \"neutral\",\n  \"tracks\": []\n}\n".to_string()
+    });
+    let updated = append_track_json(&current, &track);
+    fs::write(&catalog_path, updated)
+        .map_err(|err| format!("cannot write music library: {err}"))?;
+
+    Ok(format!(
+        "{{\"status\":\"registered\",\"path\":\"{}\",\"catalog\":\"{}\"}}\n",
+        json_escape(&path),
+        json_escape_path(&catalog_path)
+    ))
+}
+
+fn append_track_json(current: &str, track: &str) -> String {
+    if current.contains("\"tracks\": []") {
+        return current.replace(
+            "\"tracks\": []",
+            &format!("\"tracks\": [\n    {track}\n  ]"),
+        );
+    }
+    if let Some(pos) = current.rfind(']') {
+        let before = &current[..pos];
+        let after = &current[pos..];
+        let separator = if before.trim_end().ends_with('[') {
+            ""
+        } else {
+            ","
+        };
+        format!(
+            "{}{}\n    {track}\n  {}",
+            before.trim_end(),
+            separator,
+            after
+        )
+    } else {
+        format!(
+            "{{\n  \"version\": 1,\n  \"default_mood\": \"neutral\",\n  \"tracks\": [\n    {track}\n  ]\n}}\n"
+        )
+    }
 }
 
 fn apply_json_to_request(body: &str, request: &mut PipelineRequest) {
@@ -1410,6 +1737,9 @@ fn apply_json_to_request(body: &str, request: &mut PipelineRequest) {
     }
     if let Some(value) = json_string(body, "language") {
         request.language = value;
+    }
+    if let Some(value) = json_string(body, "translation_language") {
+        request.translation_language = value;
     }
     if let Some(value) = json_string(body, "recap_style") {
         request.recap_style = value;
@@ -1559,7 +1889,7 @@ HTTP:
 JSON body fields:
   images_dir, audio_dir, texts_dir, background_music, music_dir, music_mood, ml_command
   output_dir, pairing=sequential|stem
-  language, recap_style, voice, synthesize_voice=true|false
+  language, translation_language, recap_style, voice, synthesize_voice=true|false
   render=true|false, width, height, fps
 "
     );

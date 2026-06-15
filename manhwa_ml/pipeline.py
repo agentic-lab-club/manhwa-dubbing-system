@@ -9,6 +9,7 @@ from .ocr import run_ocr
 from .panels import detect_panels
 from .recap import generate_recap
 from .tts import synthesize_windows_sapi
+from .translation import translate_text
 
 
 def run_worker(manifest_path: Path, job_dir: Path, synthesize_voice: bool = False) -> dict[str, Any]:
@@ -18,6 +19,7 @@ def run_worker(manifest_path: Path, job_dir: Path, synthesize_voice: bool = Fals
     project_root = _project_root_from_job_dir(job_dir)
     pairs = _resolve_pairs(manifest.get("pairs", []), project_root)
     language = str(manifest.get("language", "eng"))
+    translation_language = str(manifest.get("translation_language", "ru"))
     style = str(manifest.get("recap_style", "engaging"))
     texts_dir = _resolve_optional_path(as_path(manifest.get("texts_dir")), project_root)
 
@@ -33,6 +35,11 @@ def run_worker(manifest_path: Path, job_dir: Path, synthesize_voice: bool = Fals
     write_text(recap_path, recap)
     artifacts.append(_artifact("recap", "completed", recap_path, "local extractive recap generated"))
 
+    translation, translation_status, translation_message = translate_text(recap, translation_language)
+    translation_path = job_dir / "translation.txt"
+    write_text(translation_path, translation)
+    artifacts.append(_artifact("translation", translation_status, translation_path, translation_message))
+
     panels_payload, panel_status, panel_message = detect_panels(pairs)
     panels_path = job_dir / "panels.json"
     write_json(panels_path, panels_payload)
@@ -44,12 +51,12 @@ def run_worker(manifest_path: Path, job_dir: Path, synthesize_voice: bool = Fals
         {
             "provider": "windows-sapi-or-external",
             "voice": manifest.get("voice", "default"),
-            "text_path": str(recap_path),
+            "text_path": str(translation_path),
         },
     )
     if synthesize_voice or bool(manifest.get("synthesize_voice", False)):
         wav_path = job_dir / "narration.wav"
-        tts_status, tts_message = synthesize_windows_sapi(recap, wav_path)
+        tts_status, tts_message = synthesize_windows_sapi(translation, wav_path)
         artifacts.append(_artifact("tts", tts_status, wav_path if wav_path.exists() else tts_request_path, tts_message))
     else:
         artifacts.append(

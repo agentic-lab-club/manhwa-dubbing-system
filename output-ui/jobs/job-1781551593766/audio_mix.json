@@ -1,0 +1,14 @@
+{
+  "strategy": "narration-plus-source-audio-plan",
+  "narration": null,
+  "background_music": null,
+  "source_audio": [
+    {"index":1,"path":"Tlok_Backend\\zvyki\\5217424338721998767.ogg","volume":1.0},
+    {"index":2,"path":"Tlok_Backend\\zvyki\\5217424338721998768.ogg","volume":1.0},
+    {"index":3,"path":"Tlok_Backend\\zvyki\\5217424338721998770.ogg","volume":1.0},
+    {"index":4,"path":"Tlok_Backend\\zvyki\\5217424338721998772.ogg","volume":1.0},
+    {"index":5,"path":"Tlok_Backend\\zvyki\\5217424338721998774.ogg","volume":1.0}
+  ],
+  "background_volume": 0.25,
+  "narration_volume": 1.0
+}

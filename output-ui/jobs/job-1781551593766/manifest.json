@@ -1,0 +1,43 @@
+{
+  "pairing": "sequential",
+  "render": false,
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "language": "eng",
+  "translation_language": "ru",
+  "recap_style": "dramatic",
+  "voice": "female_expressive",
+  "synthesize_voice": false,
+  "images_dir": "Tlok_Backend\\фото",
+  "audio_dir": "Tlok_Backend\\zvyki",
+  "music_dir": "assets/music",
+  "music_mood": "dramatic",
+  "pairs": [
+    {
+      "index": 1,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202235.png",
+      "audio": "Tlok_Backend\\zvyki\\5217424338721998767.ogg"
+    },
+    {
+      "index": 2,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202329.png",
+      "audio": "Tlok_Backend\\zvyki\\5217424338721998768.ogg"
+    },
+    {
+      "index": 3,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202408.png",
+      "audio": "Tlok_Backend\\zvyki\\5217424338721998770.ogg"
+    },
+    {
+      "index": 4,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202510.png",
+      "audio": "Tlok_Backend\\zvyki\\5217424338721998772.ogg"
+    },
+    {
+      "index": 5,
+      "image": "Tlok_Backend\\фото\\Снимок экрана 2025-11-06 202553.png",
+      "audio": "Tlok_Backend\\zvyki\\5217424338721998774.ogg"
+    }
+  ]
+}

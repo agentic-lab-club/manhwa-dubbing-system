@@ -1,0 +1,5 @@
+Style: dramatic
+
+No OCR text was available. Add . txt sidecar files or install Tesseract for real text extraction.
+
+Production note: this is a local MVP recap generated from available OCR text.
