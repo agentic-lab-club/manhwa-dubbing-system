@@ -1,0 +1,17 @@
+services:
+  manhwa-dubbing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manhwa-dubbing-system
+    ports:
+      - "8000:8000"
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+    volumes:
+      - ./output:/app/output
+      - ./assets/music:/app/assets/music
+      - ./data:/app/data
+      - ./Tlok_Backend:/app/Tlok_Backend:ro
+    restart: unless-stopped

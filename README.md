@@ -62,3 +62,19 @@ poetry install
 poetry run build-video
 poetry run manhwa-ml --help
 ```
+
+## Docker
+
+Run the whole project with one command:
+
+```powershell
+docker compose up --build
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+The compose setup persists generated jobs in `output/`, mounts `assets/music/` for background tracks, and runs the Rust backend with the Python ML worker enabled.

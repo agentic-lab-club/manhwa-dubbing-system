@@ -15,21 +15,22 @@ cargo run -- --addr 127.0.0.1:8000
 
 ## Docker Deployment
 ```bash
-docker-compose up --build -d
+docker compose up --build
 ```
-Example `docker-compose.yml`:
-```yaml
-version: '3.8'
-services:
-  backend:
-    build: ./backend
-    ports: ["8000:8000"]
-    volumes:
-      - ./data:/app/data
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-  frontend:
-    build: ./frontend
-    ports: ["3000:3000"]
+
+Open the browser UI:
+
+```text
+http://127.0.0.1:8000/
 ```
+
+Mounted directories:
+
+```text
+./output       -> /app/output
+./assets/music -> /app/assets/music
+./data         -> /app/data
+./Tlok_Backend -> /app/Tlok_Backend
+```
+
+The image includes the Rust backend binary, static frontend, Python ML worker, `ffmpeg`, and Tesseract OCR.

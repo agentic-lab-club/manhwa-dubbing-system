@@ -89,3 +89,13 @@ The worker writes:
 - `tts_request.json` or `narration.wav`
 - `audio_mix.json`
 - `ml_worker_status.json`
+
+## Docker
+
+From the project root:
+
+```powershell
+docker compose up --build
+```
+
+The container runs this backend on `0.0.0.0:8000` and enables the Python ML worker with `python -m manhwa_ml.cli`.
